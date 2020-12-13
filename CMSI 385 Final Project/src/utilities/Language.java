@@ -9,25 +9,29 @@ public class Language {
 	private Stack<Character> characters;
 	private Set<Character> operators;
 	private Stack<NFA> stackNfa;
-	private char stateID = 'a';
+	private Stack<Character> stackOperator;
+	private static char stateID = 'a';
 	private NFA nfa;
 	
 	public Language(String input) {
-		this.language = addDotConcat(input);
+		this.language = formatString(input);
 		this.characters = new Stack<Character>();
 		this.operators = new HashSet<Character>();
 		this.stackNfa = new Stack<NFA>();
-		this.nfa = new NFA();
-		populateSet();
+		this.stackOperator = new Stack<Character>();
+		populateOpSet();
 		populateStack();
-		this.nfa = generateNFA();
+		generateNFA();
+		this.nfa = stackNfa.peek();
 	}
 	
-	private void populateSet() {
+	private void populateOpSet() {
 		this.operators.add('.');
 		this.operators.add('*');
 		this.operators.add('|');
 		this.operators.add('+');
+		this.operators.add('(');
+		this.operators.add(')');
 	}
 	
 	private void populateStack() {
@@ -36,11 +40,11 @@ public class Language {
 		}
 	}
 	
-	private boolean isInputChar(Character symbol) {
-		return (symbol == '0' || symbol =='1');
+	private boolean isInputChar(char symbol) {
+		return (symbol=='0' || symbol=='1' || symbol=='e' || symbol=='l');
 	}
 	
-	private String addDotConcat(String regular) {
+	private String formatString(String regular) {
 		String newRegular = "";
 		for(int i=0; i<regular.length()-1; i++) {
 			if(regular.charAt(i)!=' ') {
@@ -71,16 +75,6 @@ public class Language {
 		return newRegular;
 	}
 	
-	private boolean priority(Character first, Character second) {
-		if(first == second) {	return true;	}
-		if(first == '*') 	{	return false;	}
-		if(second == '*')  	{	return true;	}
-		if(first == '.') 	{	return false;	}
-		if(second == '.') 	{	return true;	}
-		if(first == '|' || first == '+') 	{	return false;	}
-		else 				{	return true;	}
-	}
-	
 	private boolean isOperator(Character symbol) {
 		return this.operators.contains(symbol);
 	}
@@ -88,19 +82,25 @@ public class Language {
 	private void operate(Character op) {
 		switch (op) {
 		case ('|'):
-			union ();
+			union();
 			break;
 			
 		case ('+'):
-			union ();
+			union();
 			break;
 
 		case ('.'):
-			concatenation ();
+			concatenation();
 			break;
 
 		case ('*'):
-			star ();
+			star();
+			break;
+			
+		case ('('):
+			break;
+		
+		case (')'):
 			break;
 			
 		default :
@@ -111,22 +111,23 @@ public class Language {
 	}
 	
 	private void star() {
-		NFA nfaStates = this.stackNfa.pop();
+		NFA nfa1 = this.stackNfa.pop();
 		State before = new State(stateID++);
 		State after = new State(stateID++);
 		after.setAccept(true);
-		
-		nfaStates.setAllAccept(false);
+		Set<State> goals = nfa1.getEndStates();
+		nfa1.setAllAccept(false);
 		
 		before.addState('e', after);
 		
-		for(State s : nfaStates.getEndStates()) {
+		for(State s : goals) {
 			s.addState('e', after);
-			s.addState('e', nfaStates.getStart());
 		}
-		nfaStates.setStart(before, 'e');
-		nfaStates.setEndState(after);
-		this.stackNfa.push(nfaStates);
+		after.addState('e', nfa1.getStart());
+		NFA nfa2 = new NFA();
+		nfa2.setStart(before);
+		nfa2.setEndState(after);
+		this.stackNfa.push(nfa2);
 	}
 	
 	private void union() {
@@ -158,39 +159,75 @@ public class Language {
 	}
 	
 	private void concatenation() {
-		NFA nfa2 = stackNfa.pop();
-		NFA nfa1 = stackNfa.pop();
+		NFA nfa2 = this.stackNfa.pop();
+		NFA nfa1 = this.stackNfa.pop();
 		Set<State> goals = nfa1.getEndStates();
 		nfa1.setAllAccept(false);
 		for(State s : goals) {
-			s.addState('e', nfa2.getStart());
+			nfa1.addState(s, 'e', nfa2.getStart());
 		}
 		for(State s : nfa2.getEndStates()) {
 			nfa1.setEndState(s);
 		}
-		stackNfa.push(nfa1);
+		this.stackNfa.push(nfa1);
 	}
 		
-	public NFA generateNFA() {
-		
+	public void generateNFA() {
+		char[] array = this.language.toCharArray();
+		for(int i = 0; i < array.length; i++) {
+			if(isOperator(array[i])) {
+				this.stackOperator.push(array[i]);
+				if(array[i] == '*') {
+					Character op = this.stackOperator.pop();
+					operate(op);
+				}
+			}
+			else if(isInputChar(array[i])) {
+				State start = new State(stateID++);
+				State curState = new State(stateID++);
+				curState.setAccept(true);
+				NFA subNFA = new NFA();
+				start.addState(array[i], curState);
+				subNFA.setStart(start);
+				this.stackNfa.push(subNFA);
+				if(!this.stackOperator.isEmpty()) {
+					Character op = this.stackOperator.pop();
+					operate(op);
+				}
+			}
+			else {
+				System.out.println("Unkown Symbol: "+array[i]);
+				System.exit(1);
+			}
+		}	
+	}
+	
+	public NFA getNFA() {
+		return this.nfa;
 	}
 	
 	public String testNFA() {
-		State c = new State(stateID++);
-		State b = new State(stateID++);
+		Language.stateID='a';
 		State a = new State(stateID++);
+		State b = new State(stateID++);
+		State c = new State(stateID++);
 		State d = new State(stateID++);
 		State e = new State(stateID++);
 		e.setAccept(true);
-		a.addState('0', b);
-		a.addState('1', c);
+		a.addState('e', b);
+		a.addState('e', c);
 		b.addState('0', d);
 		b.addState('1', a);
 		c.addState('0', a);
 		c.addState('1', d);
 		d.addState('1', e);
+		e.addState('e', a);
 		NFA nf = new NFA();
 		nf.setStart(a);
 		return nf.toString();
+	}
+	
+	public String getLanguage() {
+		return this.language;
 	}
 }

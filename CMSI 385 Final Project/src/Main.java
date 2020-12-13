@@ -10,7 +10,8 @@ public class Main {
 		Scanner input = new Scanner(System.in);
 		String s = input.next();
 		Language l = new Language(s);
-		System.out.println(l.testNFA());
+		System.out.println(l.getLanguage());
+		System.out.println(l.getNFA().toString());
 		input.close();
 	}
 }

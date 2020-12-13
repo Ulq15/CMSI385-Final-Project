@@ -1,6 +1,7 @@
 package utilities;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class NFA {
@@ -25,8 +26,8 @@ public class NFA {
 			traverseStates(this.start);
 		}	
 	}
-	
-	public void setStart(State s, Character c) {
+	/*
+	public void setNewStart(State s, Character c) {
 		if(this.start == null) {
 			this.start = s;
 		}
@@ -37,7 +38,7 @@ public class NFA {
 		this.states.add(s);
 		traverseStates(this.start);
 	}
-	
+	*/
 	private void traverseStates(State start) {
 		if(start.getAccept()) {
 			this.endStates.add(start);
@@ -45,9 +46,12 @@ public class NFA {
 		if(start.hasTransitions()) {
 			Set<Character> keys = start.getTransitions();
 			for(Character c : keys) {
-				if(!this.states.contains(start.getNextState(c))) {
-					this.states.add(start.getNextState(c));
-					traverseStates(start.getNextState(c));
+				List<State> states = start.getNextState(c);
+				for(State s : states){
+					if(!this.states.contains(s)) {
+						this.states.add(s);
+						traverseStates(s);
+					}
 				}
 			}
 		}
@@ -60,21 +64,22 @@ public class NFA {
 		first.addState(c, second);
 		this.states.add(first);
 		this.states.add(second);
+		traverseStates(first);
 	}
 	
-	public State getNextState(State first, Character c) {
+	public List<State> getNextState(State first, Character c) {
 		return first.getNextState(c);
 	}
 	
 	public void setAllAccept(boolean bool) {
-		if(!bool) {
-			this.endStates = new HashSet<State>();
-		}
 		for(State s : this.states) {
 			s.setAccept(bool);
 			if(bool) {
 				this.endStates.add(s);
 			}
+		}
+		if(!bool) {
+			this.endStates = new HashSet<State>();
 		}
 	}
 	
@@ -84,7 +89,9 @@ public class NFA {
 	
 	public void setEndState(State end) {
 		this.endStates = new HashSet<State>();
+		end.setAccept(true);
 		this.endStates.add(end);
+		this.states.add(end);
 	}
 	
 	public String toString() {
@@ -95,7 +102,7 @@ public class NFA {
 	
 	private String toStringHelper() {
 		String table = "^ means Start\n* means Accept\n";
-		table+= "         0       1\n";
+		table+= "        0      1      e\n";
 		for(State s : this.states) {
 			String str = s.toString();
 			if(this.start == s) {
